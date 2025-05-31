@@ -88,7 +88,7 @@
 *   Characters can have custom avatars, backgrounds, and animated live portraits.
 *   Batch delete and export character data in management mode, supports character gallery and image generation.
 
-### 2. Smart Chat
+### 2. Chat
 
 *   Independently implemented World Info, Presets, and character information systems equivalent to SillyTavern's functions:
     *   **World Info Entry Management**: Automatically inject relevant world setting entries into the conversation, intelligently matched based on conversation keywords.
