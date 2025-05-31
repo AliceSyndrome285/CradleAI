@@ -17,6 +17,9 @@ interface UnifiedApiOptions {
   characterId?: string;
   openaiConfig?: Partial<OpenAICompatibleConfig>;
   openrouterConfig?: {
+    enabled?: boolean;
+    apiKey?: string;
+    model?: string;
     additionalKeys?: string[];
     useKeyRotation?: boolean;
     backupModel?: string;
@@ -68,18 +71,16 @@ export async function unifiedGenerateContent(
   }
 
   if (adapter === 'openai-compatible') {
-    // OpenAIAdapter: 只支持OpenAI消息格式
-    const openaiMessages = messages.map(msg =>
-      'content' in msg ? { role: msg.role, content: (msg as any).content } : {
-        role: msg.role,
-        content: (msg as any).parts?.[0]?.text || ''
-      }
-    );
+    // OpenAIAdapter: 需要将消息转换为ChatMessage格式
+    const chatMessages = messages.map(msg => ({
+      role: msg.role,
+      parts: [{ text: ('content' in msg ? (msg as any).content : (msg as any).parts?.[0]?.text || '') }]
+    }));
     // 支持可选配置
     if (typeof OpenAIAdapter.prototype.generateContent === 'function') {
       // 直接用静态方法（如有），否则实例化
       if (typeof (OpenAIAdapter as any).executeDirectGenerateContent === 'function') {
-        return await (OpenAIAdapter as any).executeDirectGenerateContent(openaiMessages, {
+        return await (OpenAIAdapter as any).executeDirectGenerateContent(chatMessages, {
           apiKey,
           characterId,
           modelId,
@@ -93,7 +94,7 @@ export async function unifiedGenerateContent(
           model: modelId || options.openaiConfig?.model || 'gpt-3.5-turbo'
         };
         const adapterInstance = new OpenAIAdapter(config);
-        return await adapterInstance.generateContent(openaiMessages, characterId);
+        return await adapterInstance.generateContent(chatMessages, characterId);
       }
     }
     throw new Error('OpenAIAdapter 不支持 generateContent');

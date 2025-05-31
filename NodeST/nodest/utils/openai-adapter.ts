@@ -157,7 +157,7 @@ export class OpenAIAdapter {
   }
 
   async chatCompletion(
-    messages: Array<{ role: string; content: string }>,
+    messages: Array<{ role: string; content: string | any[] }>,
     options?: {
       temperature?: number;
       max_tokens?: number;

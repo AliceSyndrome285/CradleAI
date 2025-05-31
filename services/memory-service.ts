@@ -129,7 +129,7 @@ export class MemoryService {
     chatHistory: ChatHistoryEntity,
     apiKey: string,
     apiSettings?: {
-      apiProvider: 'gemini' | 'openrouter',
+      apiProvider: 'gemini' | 'openrouter' | 'openai-compatible',
       openrouter?: {
         enabled?: boolean;
         apiKey?: string;
@@ -170,7 +170,8 @@ export class MemoryService {
         settings,
         apiKey,
         apiSettings,
-        finalSummaryRange
+        finalSummaryRange,
+        false // 非强制模式
       );
     } catch (error) {
       console.error(`[MemoryService] Error in checkAndSummarize for ${conversationId}:`, error);
@@ -202,7 +203,7 @@ export class MemoryService {
         return JSON.parse(saved);
       }
     } catch (e) {
-      console.error('[MemoryService] 加载记忆总结配置失败:', e);
+      console.error('[MemoryService] 加载记忆总结提示词配置失败:', e);
     }
     return null;
   }
@@ -239,6 +240,7 @@ export class MemoryService {
    * @param apiKey API密钥
    * @param apiSettings API设置
    * @param summaryRange 可选，指定需要摘要的消息区间（如 {start: 5, end: 9} 表示第6~10条）
+   * @param forceGenerate 可选，是否强制生成总结（跳过长度检查）
    */
   public async generateSummary(
     conversationId: string,
@@ -246,16 +248,19 @@ export class MemoryService {
     settings: MemorySummarySettings,
     apiKey: string,
     apiSettings?: {
-      apiProvider: 'gemini' | 'openrouter',
+      apiProvider: 'gemini' | 'openrouter' | 'openai-compatible',
       openrouter?: {
         enabled?: boolean;
         apiKey?: string;
         model?: string;
       }
     },
-    summaryRange?: { start: number, end: number }
+    summaryRange?: { start: number, end: number },
+    forceGenerate?: boolean
   ): Promise<ChatHistoryEntity> {
     try {
+      console.log(`[MemoryService] generateSummary called with forceGenerate=${forceGenerate}`);
+      
       // Always use clean chat history from StorageAdapter
       const cleanMessages = await StorageAdapter.getCleanChatHistory(conversationId);
       const messages = cleanMessages;
@@ -267,6 +272,7 @@ export class MemoryService {
 
       const totalTextLength = messages.reduce((sum, msg) => sum + (msg.parts?.[0]?.text?.length || 0), 0);
       console.log(`[MemoryService] Chat history total length: ${totalTextLength} characters`);
+      console.log(`[MemoryService] finalSummaryRange:`, finalSummaryRange);
 
       let startIdx: number, endIdx: number;
       if (finalSummaryRange && typeof finalSummaryRange.start === 'number' && typeof finalSummaryRange.end === 'number') {
@@ -274,23 +280,44 @@ export class MemoryService {
         endIdx = finalSummaryRange.end + 1;
         if (startIdx < 0) startIdx = 0;
         if (endIdx > messages.length) endIdx = messages.length;
-        if (endIdx - startIdx < 1) {
+        if (endIdx - startIdx < 1 && !forceGenerate) {
           console.log(`[MemoryService] summaryRange too small, skipping`);
           // Return original chatHistoryEntity with clean messages
           return { ...chatHistory, parts: messages };
         }
-        console.log(`[MemoryService] Using custom summary range: [${startIdx}, ${endIdx - 1}]`);
-      } else {
-        startIdx = 3;
-        endIdx = messages.length - 3;
-        if (endIdx - startIdx < 4) {
-          console.log(`[MemoryService] Middle section too small (${endIdx - startIdx} messages), skipping`);
-          return { ...chatHistory, parts: messages };
+        // 如果forceGenerate为true，即使范围很小也要强制生成
+        if (forceGenerate && endIdx - startIdx < 1) {
+          startIdx = 0;
+          endIdx = messages.length;
+          console.log(`[MemoryService] Force generate mode with small range, summarizing all ${messages.length} messages`);
+        } else {
+          console.log(`[MemoryService] Using custom summary range: [${startIdx}, ${endIdx - 1}]`);
         }
-        console.log(`[MemoryService] Using default summary range: [${startIdx}, ${endIdx - 1}]`);
+      } else {
+        // 修复：对于少量消息，允许总结所有消息
+        if (messages.length <= 6 || forceGenerate) {
+          // 如果消息总数很少或强制生成，总结所有消息
+          startIdx = 0;
+          endIdx = messages.length;
+          console.log(`[MemoryService] ${forceGenerate ? 'Force generate mode' : 'Few messages detected'}, summarizing all ${messages.length} messages`);
+        } else {
+          // 原来的逻辑：保留开头和结尾的消息，总结中间部分
+          startIdx = 3;
+          endIdx = messages.length - 3;
+          if (endIdx - startIdx < 4) {
+            console.log(`[MemoryService] Middle section too small (${endIdx - startIdx} messages), skipping`);
+            return { ...chatHistory, parts: messages };
+          }
+          console.log(`[MemoryService] Using default summary range: [${startIdx}, ${endIdx - 1}]`);
+        }
       }
 
       const messagesToSummarize = messages.slice(startIdx, endIdx);
+
+      if (messagesToSummarize.length === 0) {
+        console.log(`[MemoryService] No messages to summarize after range selection, skipping`);
+        return { ...chatHistory, parts: messages };
+      }
 
       const formattedMessages = messagesToSummarize.map(msg => {
         const role = msg.role === 'user' ? 'User' : 'Character';
@@ -413,7 +440,7 @@ ${formattedMessages}`
         apiKey: apiKeyToUse,
         characterId: conversationId,
         openrouterConfig: chatSettings?.openrouter,
-        OpenAIcompatibleConfig: chatSettings?.OpenAIcompatible, // 传递完整配置
+        openaiConfig: chatSettings?.OpenAIcompatible, // 修正字段名称以匹配接口
         geminiConfig: {
           additionalKeys: chatSettings?.additionalGeminiKeys,
           useKeyRotation: chatSettings?.useGeminiKeyRotation,
@@ -507,7 +534,7 @@ ${formattedMessages}`
     characterId: string,
     apiKey: string,
     apiSettings?: {
-      apiProvider: 'gemini' | 'openrouter',
+      apiProvider: 'gemini' | 'openrouter' | 'openai-compatible',
       openrouter?: {
         enabled?: boolean;
         apiKey?: string;
@@ -535,7 +562,8 @@ ${formattedMessages}`
         settings,
         apiKey,
         apiSettings,
-        summaryRange
+        summaryRange,
+        true // 强制生成总结
       );
 
       // 保存新历史（优先保存到 expo-file-system）

@@ -189,7 +189,7 @@ const Profile: React.FC = () => {
           title="关于"
           leftIcon="information-circle-outline"
           chevron={false}
-          subtitle="GitHub | CradleAI | 1.0.3"
+          subtitle="GitHub | CradleAI | 1.0.4"
           onPress={() => Linking.openURL('https://github.com/AliceSyndrome285/CradleAI')}
         />
       </ScrollView>
