@@ -32,7 +32,7 @@
 </table>
 
 ## Contact and Feedback
-
+*   **Discord:**  https://discord.gg/TMmgtPpU (For tutorial,Q&A, bug reports, feedback)
 *   **QQ Group:** 1017292082 (For Q&A, bug reports, feedback)
 
 ## Update Log
@@ -70,57 +70,48 @@ Continued to fix some issues for 1.0.3, no new features added.
 
 *   Fixed the issue where group chats could not be disbanded.
 
-### 0514 - 1.0.3
+### 1.0.4
 
-**1. Regex Enhancement**
+         ✔ Added `Tool Settings` page to customize prompts for summaries, automatic messages, and image generation.
 
-*   Updated global and local regular expressions for character binding.
-*   When importing a character card, character-bound regex will be automatically imported, but you need to bind and save it on the Regex page.
+         ✔ Summaries can now be generated and managed by clicking the `Globe` button in the top right corner.
 
-**2. Frontend Card Adaption**
+         ✔ Section Summary: Customize the message range and word count for summaries.
 
-*   Supports using regular expressions with frontend cards for gameplay.
-*   **Note:**
-    *   If the frontend card is not fully adapted for mobile, there may be some loss of functionality.
-    *   If the opening message is not a standard HTML page, the application will attempt to auto-complete it, but it's not guaranteed to cover all cases. It is recommended to complete it to a standard HTML page format before importing. For example:
+         ✔ Added three channels: cosyvoice, minimax, and Doubao (cosyvoice and minimax use Replicate and require self-prepared accounts). minimax and cosyvoice support voice cloning. cosyvoice allows direct selection of pre-set voice profiles from the character voice interface.(PS cosyvoice and minimax generally have the best voice replication effects, but Replicate's cosyvoice is very slow and expensive, costing about 8 cents per sentence --- please choose carefully based on your financial situation).
 
-**3. Page Log**
+         ✔ Decoupled table memory and vector memory. Table memory can now be used independently.
 
-*   Added a page log to view request messages and results.
+         ✔ Rewrote context to improve performance. Deletion and editing no longer cause errors.
 
-**4. Bug Fixes**
+         ✔ Added `Tool Settings` page to customize prompts for summaries, automatic messages, and image generation.
 
-*   Fixed issues with importing some large character cards.
-*   Fixed some prompt issues in the Circle feature.
-*   Fixed the issue where Global World Info could not be saved.
-*   Fixed the issue where Global Presets could not be modified.
-*   Fixed errors when deleting/editing the first AI message.
+         ✔ Added a Preset/World Book test page to test the message array being sent.
 
-**5. UI Optimization**
+         ✔ Debounced the message list.
 
-*   Supports hiding the top bar.
-*   Optimized the responsive layout of the Global Settings page.
+         ✔ Fixed the issue where the archive function was invalid.
 
-**6. New Text Macros**
+         ✔ Fixed the issue where sending messages after importing `Remove User Input` type regular expressions caused errors.
 
-*   `{{lastusermessage}}`: The latest user message, equivalent to the existing `{{lastmessage}}`.
-*   `{{lastcharmessage}}`: The latest character message.
-*   `{{random::A::B...}}`: Will be replaced by a random value from the provided parameters. For example, `{{random::A::B::C}}` will be replaced by one of A, B, or C. If no parameters are provided, it will be replaced by a random number between 0 and 1.
-*   `{{roll::A}}`: Will be replaced by a random number between 1 and A. If A starts with `d`, it will be replaced by a random number between 1 and A, excluding `d`.
+         ✔ Added a function to create a new blank branch.
 
-**7. Opening Message Enhancement**
+         ✔ Supported the display of NovelAI illustrations in three modes.
 
-*   Supports importing multiple opening messages when importing a character card, which can be switched on the details page.
+         ✔ Resolved the issue where character card backgrounds and avatars were lost after deleting the cache.
 
-**8. Error Handling**
+         ✔ Customized NAI endpoint.
 
-*   User and AI message entries corresponding to erroneous requests will be automatically cleared.
+         ✔ Customized OpenAI compatible endpoint (no longer requires the v1/chat/completions suffix).
 
-**9. Performance Optimization**
+         ✔ Automatic NovelAI illustration generation function (now includes an automatic background generation function).
 
-*   Optimized page performance and layout, reducing lag and heating issues.
-*   Resolved crashing issues when sending messages on some devices.
-*   Reduced unnecessary log printing.
+         ✔ Customized interface UI and markdown colors.
+
+         ✔ Resolved the issue of being unable to send images.
+
+         ✔ Resolved the issue of errors when importing Tavern JSON character cards.
+
 
 ## Key Features
 
