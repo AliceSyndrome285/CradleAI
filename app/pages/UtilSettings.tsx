@@ -362,30 +362,22 @@ export default function UtilSettings() {
     setApiResponse('');
     setApiLoading(true);
     try {
-      let currentMessageArray, currentAdapter;
+      let currentMessageArray;
       if (activeTab === 'autoMessage') {
         currentMessageArray = messageArray;
-        currentAdapter = adapterType;
       } else if (activeTab === 'memorySummary') {
         currentMessageArray = memoryMessageArray;
-        currentAdapter = memoryAdapterType;
       } else if (activeTab === 'imagegen') {
         currentMessageArray = imagegenMessageArray;
-        currentAdapter = imagegenAdapterType;
       }
       if (!currentMessageArray || currentMessageArray.length === 0) {
         setError('请先生成消息数组');
         setApiLoading(false);
         return;
       }
-      const apiSettings = getApiSettings();
-      if (!currentAdapter) {
-        throw new Error('Adapter type is not selected');
-      }
-      const options = {
-        ...apiSettings,
-        adapter: currentAdapter
-      } as const;
+      
+      // 不再手动指定adapter，让unifiedGenerateContent从设置中自动确定
+      const options = {}; // 空对象，让函数自动从设置获取所有配置
       const resp = await unifiedGenerateContent(currentMessageArray, options);
       setApiResponse(typeof resp === 'string' ? resp : JSON.stringify(resp));
     } catch (e: any) {

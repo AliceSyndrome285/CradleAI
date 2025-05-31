@@ -1,6 +1,7 @@
 import { GeminiAdapter } from '@/NodeST/nodest/utils/gemini-adapter';
 import { OpenAIAdapter, OpenAICompatibleConfig } from '@/NodeST/nodest/utils/openai-adapter';
 import { OpenRouterAdapter } from '@/utils/openrouter-adapter';
+import { getApiSettings } from '@/utils/settings-helper';
 
 // 支持的适配器类型
 type AdapterType = 'gemini' | 'openai-compatible' | 'openrouter';
@@ -11,7 +12,7 @@ type UnifiedMessage =
   | { role: string; parts: { text: string }[] }; // Gemini
 
 interface UnifiedApiOptions {
-  adapter: AdapterType;
+  adapter?: AdapterType; // 改为可选，如果不提供则从settings自动确定
   apiKey?: string;
   modelId?: string;
   characterId?: string;
@@ -38,14 +39,46 @@ interface UnifiedApiOptions {
 /**
  * 统一API服务：根据适配器类型和参数，调用对应适配器的文本生成方法
  * @param messages 消息数组（格式兼容OpenAI/Gemini/OpenRouter）
- * @param options 适配器类型及API设置信息
+ * @param options 适配器类型及API设置信息（adapter可选，不提供时从设置自动确定）
  * @returns Promise<string> 响应文本
  */
 export async function unifiedGenerateContent(
   messages: UnifiedMessage[],
-  options: UnifiedApiOptions
+  options: UnifiedApiOptions = {}
 ): Promise<string> {
-  const { adapter, apiKey, modelId, characterId } = options;
+  // 如果没有指定adapter，从设置中自动确定
+  let { adapter, apiKey, modelId, characterId } = options;
+  
+  if (!adapter) {
+    const apiSettings = getApiSettings();
+    const provider = apiSettings.apiProvider?.toLowerCase() || 'gemini';
+    
+    if (provider.includes('gemini')) {
+      adapter = 'gemini';
+    } else if (provider.includes('openrouter')) {
+      adapter = 'openrouter';
+    } else if (provider.includes('openai') || provider === 'openai-compatible') {
+      adapter = 'openai-compatible';
+    } else {
+      adapter = 'gemini'; // 默认fallback
+    }
+  }
+
+  // 如果没有提供apiKey等信息，从设置中获取
+  if (!apiKey || !modelId) {
+    const apiSettings = getApiSettings();
+    
+    if (adapter === 'gemini') {
+      apiKey = apiKey || apiSettings.apiKey;
+      modelId = modelId || apiSettings.geminiPrimaryModel || 'gemini-pro';
+    } else if (adapter === 'openrouter') {
+      apiKey = apiKey || apiSettings.openrouter?.apiKey;
+      modelId = modelId || apiSettings.openrouter?.model || 'openai/gpt-3.5-turbo';
+    } else if (adapter === 'openai-compatible') {
+      apiKey = apiKey || apiSettings.OpenAIcompatible?.apiKey;
+      modelId = modelId || apiSettings.OpenAIcompatible?.model || 'gpt-3.5-turbo';
+    }
+  }
 
   if (adapter === 'gemini') {
     // GeminiAdapter: 支持OpenAI格式和Gemini格式消息
