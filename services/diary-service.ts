@@ -1,10 +1,10 @@
 import { Character, DiaryEntry, DiarySettings, } from '@/shared/types';
 import { CircleMemory } from '@/shared/types/circle-types';
-import { ApiServiceProvider } from './api-service-provider';
 import { StorageAdapter } from '@/NodeST/nodest/utils/storage-adapter';
 import { generateUUID } from '@/utils/uuid';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getUserSettingsGlobally } from '@/utils/settings-helper';
+import { getApiSettings } from '@/utils/settings-helper';
+import { unifiedGenerateContent } from '@/services/unified-api';
 import { format } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 
@@ -166,30 +166,58 @@ ${chatContext}
 
 请直接开始撰写日记，不要有任何前缀或标题，符合${character.name}的风格。`;
 
-      // Get global API settings
-      const globalSettings = getUserSettingsGlobally();
-      const apiSettings = globalSettings?.chat;
+      // Get API settings from settings-helper
+      const apiSettings = getApiSettings();
       
-      // Get API key from global settings
-      const apiKey = apiSettings?.characterApiKey || '';
-      
-      // Configure API options based on global settings
-      const apiOptions = {
-        apiProvider: apiSettings?.apiProvider || 'gemini',
-        openrouter: apiSettings?.openrouter,
-        OpenAIcompatible: apiSettings?.OpenAIcompatible,
-        additionalGeminiKeys: apiSettings?.additionalGeminiKeys,
-        useGeminiModelLoadBalancing: apiSettings?.useGeminiModelLoadBalancing,
-        useGeminiKeyRotation: apiSettings?.useGeminiKeyRotation,
-        useCloudService: apiSettings?.useCloudService,
-        cloudModel: apiSettings?.cloudModel,
-        geminiPrimaryModel: apiSettings?.geminiPrimaryModel,
-        geminiBackupModel: apiSettings?.geminiBackupModel,
-        retryDelay: apiSettings?.retryDelay
+      if (!apiSettings.apiKey && !apiSettings.useCloudService) {
+        throw new Error('No API key available and cloud service is disabled');
+      }
+
+      // Prepare unified API options based on provider
+      let unifiedOptions: any = {
+        adapter: apiSettings.apiProvider as any,
+        apiKey: apiSettings.apiKey,
+        characterId: character.id
       };
 
-      // Generate diary content using API service with global settings
-      const response = await ApiServiceProvider.generatePlainText(prompt, apiKey, apiOptions);
+      // Configure provider-specific options
+      if (apiSettings.apiProvider === 'openai-compatible' && apiSettings.OpenAIcompatible?.enabled) {
+        unifiedOptions.openaiConfig = {
+          endpoint: apiSettings.OpenAIcompatible.endpoint,
+          model: apiSettings.OpenAIcompatible.model,
+          temperature: apiSettings.OpenAIcompatible.temperature,
+          max_tokens: apiSettings.OpenAIcompatible.max_tokens,
+          stream: apiSettings.OpenAIcompatible.stream
+        };
+        unifiedOptions.modelId = apiSettings.OpenAIcompatible.model;
+      } else if (apiSettings.apiProvider === 'openrouter' && apiSettings.openrouter?.enabled) {
+        unifiedOptions.openrouterConfig = {
+          enabled: true,
+          apiKey: apiSettings.openrouter.apiKey,
+          model: apiSettings.openrouter.model
+        };
+        unifiedOptions.modelId = apiSettings.openrouter.model;
+      } else if (apiSettings.apiProvider === 'gemini') {
+        unifiedOptions.geminiConfig = {
+          additionalKeys: apiSettings.additionalGeminiKeys,
+          useKeyRotation: apiSettings.useGeminiKeyRotation,
+          useModelLoadBalancing: apiSettings.useGeminiModelLoadBalancing,
+          backupModel: apiSettings.geminiBackupModel,
+          retryDelay: apiSettings.retryDelay
+        };
+        unifiedOptions.modelId = apiSettings.geminiPrimaryModel;
+      }
+
+      // Create messages array for unified API
+      const messages = [
+        {
+          role: 'user',
+          content: prompt
+        }
+      ];
+
+      // Generate diary content using unified API
+      const response = await unifiedGenerateContent(messages, unifiedOptions);
 
       if (!response) {
         throw new Error('Failed to generate diary content');
