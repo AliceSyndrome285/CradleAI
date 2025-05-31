@@ -1,4 +1,4 @@
-# Project Documentation
+# CradleAI
 
 ## Interface Preview
 
@@ -35,40 +35,7 @@
 *   **Discord:**  https://discord.gg/TMmgtPpU (For tutorial,Q&A, bug reports, feedback)
 *   **QQ Group:** 1017292082 (For Q&A, bug reports, feedback)
 
-## Update Log
-
-### 0518 - 1.0.3 Further Optimization
-
-Continued to fix some issues for 1.0.3, no new features added.
-
-**Memory System**
-
-*   Resolved potential application crashes caused by the memory system.
-*   Removed redundant settings button.
-*   Added more processing methods for table memory, now including: Rebuild, Repair, Summary, Simplify, Refresh, etc.
-
-**Global Regex**
-
-*   If the regex to clear user input causes a message sending error (under construction).
-*   When importing a character card, if the card has a regex script, it will be automatically bound to the character.
-
-**Bug Fixes**
-
-*   Issue where character details World Info could not be saved normally after editing/adding.
-*   Issue where the position of system default preset entries could not be modified in Global Presets.
-*   Codeblock rendering error.
-
-**Performance Optimization**
-
-*   Index page performance optimization.
-
-**UI Optimization**
-
-*   Character World Info editing now uses a full-screen editor window instead of a narrow modal.
-
-**Group Chat**
-
-*   Fixed the issue where group chats could not be disbanded.
+## Changelog Log
 
 ### 1.0.4
 
