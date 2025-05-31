@@ -32,7 +32,7 @@
 </table>
 
 ## Contact and Feedback
-
+*   **Discord:**  https://discord.gg/TMmgtPpU (For tutorial,Q&A, bug reports, feedback)
 *   **QQ Group:** 1017292082 (For Q&A, bug reports, feedback)
 
 ## Update Log
