@@ -1944,134 +1944,164 @@ const MemoOverlay: React.FC<MemoOverlayProps> = ({ isVisible, onClose, character
         </View>
       </View>
 
-      {isLoadingSummaries ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#ff9f1c" />
-          <Text style={styles.loadingText}>加载总结中...</Text>
-        </View>
-      ) : summaries.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>暂无总结内容</Text>
-          {characterId && conversationId && (
-            <TouchableOpacity 
-              style={styles.createMemoryButton}
-              onPress={async () => {
-                try {
-                  Alert.alert('提示', '正在生成对话总结，请稍候...');
-                  const safeConversationId = getSafeConversationId(conversationId);
-                  
-                  // 获取API设置
-                  const settings = getApiSettings();
-                  // 适配API设置格式
-                  const apiConfig = {
-                    apiProvider: settings.apiProvider as 'gemini' | 'openrouter'| 'openai-compatible',
-                    openrouter: settings.openrouter,
-                    apikey: settings.apiKey // 确保API密钥正确传递
-                  };
-                  
-                  const result = await memoryService.summarizeMemoryNow(
-                    safeConversationId, 
-                    characterId,
-                    settings.apiKey || '', // API key will be loaded from settings
-                    apiConfig // 使用从settings-helper获取的API设置
-                  );
-                  
-                  if (result) {
-                    Alert.alert('成功', '对话总结已生成');
-                    await fetchSummaries();
-                  } else {
+          {isLoadingSummaries ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#ff9f1c" />
+              <Text style={styles.loadingText}>加载总结中...</Text>
+            </View>
+          ) : summaries.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyText}>暂无总结内容</Text>
+              {characterId && conversationId && (
+                <TouchableOpacity 
+                  style={styles.createMemoryButton}
+                  onPress={async () => {
                     try {
-                      const cleanMessages = await StorageAdapter.getCleanChatHistory(safeConversationId);
-                      if (!cleanMessages || cleanMessages.length === 0) {
+                      Alert.alert('提示', '正在生成对话总结，请稍候...');
+                      const safeConversationId = getSafeConversationId(conversationId);
+                      
+                      // 获取API设置
+                      const settings = getApiSettings();
+                      // 适配API设置格式
+                      const apiConfig = {
+                        apiProvider: settings.apiProvider as 'gemini' | 'openrouter'| 'openai-compatible',
+                        openrouter: settings.openrouter
+                      };
+                      // === 修正API Key选择逻辑 ===
+                      let apiKeyToUse = '';
+                      if (settings.apiProvider === 'openai-compatible') {
+                        apiKeyToUse = settings.OpenAIcompatible?.apiKey || '';
+                      } else if (settings.apiProvider === 'openrouter') {
+                        apiKeyToUse = settings.openrouter?.apiKey || '';
+                      } else {
+                        apiKeyToUse = settings.apiKey || '';
+                      }
+                      // === 新增日志 ===
+                      console.log('[MemoOverlay] summarizeMemoryNow 请求参数:', {
+                        conversationId: safeConversationId,
+                        characterId,
+                        apiKey: apiKeyToUse,
+                        apiConfig
+                      });
+                      const result = await memoryService.summarizeMemoryNow(
+                        safeConversationId, 
+                        characterId,
+                        apiKeyToUse,
+                        apiConfig
+                      );
+                      
+                      if (result) {
+                        Alert.alert('成功', '对话总结已生成');
+                        await fetchSummaries();
+                      } else {
+                        try {
+                          const cleanMessages = await StorageAdapter.getCleanChatHistory(safeConversationId);
+                          if (!cleanMessages || cleanMessages.length === 0) {
+                            Alert.alert('错误', '未找到聊天历史，无法生成总结');
+                          } else {
+                            Alert.alert('错误', '生成对话总结失败');
+                          }
+                        } catch (e) {
+                          Alert.alert('错误', '生成对话总结失败');
+                        }
+                      }
+                    } catch (e: any) {
+                      if (e && e.message && e.message.includes('未找到聊天历史')) {
                         Alert.alert('错误', '未找到聊天历史，无法生成总结');
+                      } else {
+                        console.error('[MemoOverlay] Error generating summary:', e);
+                        Alert.alert('错误', '生成对话总结失败');
+                      }
+                    }
+                  }}
+                >
+                  <Text style={styles.createMemoryButtonText}>立即生成对话总结</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : (
+            <ScrollView style={styles.memoriesList}>
+              {summaries.map((summary, idx) => (
+                <View key={summary.timestamp || idx} style={styles.memoryItem}>
+                  <View style={styles.memoryHeader}>
+                    <MaterialCommunityIcons name="file-document-outline" size={18} color="#ff9f1c" style={{ marginRight: 12 }} />
+                    <View style={styles.memoryContent}>
+                      <Text style={styles.memoryText}>
+                        {summary.summary || summary.parts?.[0]?.text?.replace(/^---.*?---\n|---.*?---$/g, '') || '(无内容)'}
+                      </Text>
+                    </View>
+                    <TouchableOpacity onPress={() => handleDeleteSummary(summary.timestamp)}>
+                      <Ionicons name="trash" size={20} color="#e74c3c" />
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.memoryDetails}>
+                    <Text style={styles.metadataLabel}>时间:</Text>
+                    <Text style={styles.metadataValue}>{formatTimestamp(summary.timestamp)}</Text>
+                    {summary.originalMessagesRange && (
+                      <Text style={styles.metadataValue}>
+                        对话区间: {summary.originalMessagesRange.start} - {summary.originalMessagesRange.end}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              ))}
+              
+              {characterId && conversationId && summaries.length > 0 && (
+                <TouchableOpacity 
+                    style={[styles.createMemoryButton, { marginTop: 20, backgroundColor: 'rgba(255, 159, 28, 0.2)' }]}
+                    onPress={async () => {
+                    try {
+                      Alert.alert('提示', '正在生成新的对话总结，请稍候...');
+                      const safeConversationId = getSafeConversationId(conversationId);
+                      
+                      // 获取API设置
+                      const settings = getApiSettings();
+                      // 适配API设置格式
+                      const apiConfig = {
+                        apiProvider: settings.apiProvider as 'gemini' | 'openrouter' | 'openai-compatible',
+                        openrouter: settings.openrouter
+                      };
+                      // === 修正API Key选择逻辑 ===
+                      let apiKeyToUse = '';
+                      if (settings.apiProvider === 'openai-compatible') {
+                        apiKeyToUse = settings.OpenAIcompatible?.apiKey || '';
+                      } else if (settings.apiProvider === 'openrouter') {
+                        apiKeyToUse = settings.openrouter?.apiKey || '';
+                      } else {
+                        apiKeyToUse = settings.apiKey || '';
+                      }
+                      // === 新增日志 ===
+                      console.log('[MemoOverlay] summarizeMemoryNow 请求参数:', {
+                        conversationId: safeConversationId,
+                        characterId,
+                        apiKey: apiKeyToUse,
+                        apiConfig
+                      });
+                      console.log('[MemoOverlay] Generating new summary with config:', apiConfig);
+                      const result = await memoryService.summarizeMemoryNow(
+                        safeConversationId, 
+                        characterId,
+                        apiKeyToUse,
+                        apiConfig
+                      );
+                      
+                      if (result) {
+                        Alert.alert('成功', '新的对话总结已生成');
+                        await fetchSummaries();
                       } else {
                         Alert.alert('错误', '生成对话总结失败');
                       }
-                    } catch (e) {
+                    } catch ( e) {
+                      console.error('[MemoOverlay] Error generating summary:', e);
                       Alert.alert('错误', '生成对话总结失败');
                     }
-                  }
-                } catch (e: any) {
-                  if (e && e.message && e.message.includes('未找到聊天历史')) {
-                    Alert.alert('错误', '未找到聊天历史，无法生成总结');
-                  } else {
-                    console.error('[MemoOverlay] Error generating summary:', e);
-                    Alert.alert('错误', '生成对话总结失败');
-                  }
-                }
-              }}
-            >
-              <Text style={styles.createMemoryButtonText}>立即生成对话总结</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      ) : (
-        <ScrollView style={styles.memoriesList}>
-          {summaries.map((summary, idx) => (
-            <View key={summary.timestamp || idx} style={styles.memoryItem}>
-              <View style={styles.memoryHeader}>
-                <MaterialCommunityIcons name="file-document-outline" size={18} color="#ff9f1c" style={{ marginRight: 12 }} />
-                <View style={styles.memoryContent}>
-                  <Text style={styles.memoryText}>
-                    {summary.summary || summary.parts?.[0]?.text?.replace(/^---.*?---\n|---.*?---$/g, '') || '(无内容)'}
-                  </Text>
-                </View>
-                <TouchableOpacity onPress={() => handleDeleteSummary(summary.timestamp)}>
-                  <Ionicons name="trash" size={20} color="#e74c3c" />
+                  }}
+                >
+                  <Text style={styles.createMemoryButtonText}>生成新的对话总结</Text>
                 </TouchableOpacity>
-              </View>
-              <View style={styles.memoryDetails}>
-                <Text style={styles.metadataLabel}>时间:</Text>
-                <Text style={styles.metadataValue}>{formatTimestamp(summary.timestamp)}</Text>
-                {summary.originalMessagesRange && (
-                  <Text style={styles.metadataValue}>
-                    对话区间: {summary.originalMessagesRange.start} - {summary.originalMessagesRange.end}
-                  </Text>
-                )}
-              </View>
-            </View>
-          ))}
-          
-          {characterId && conversationId && summaries.length > 0 && (
-            <TouchableOpacity 
-                style={[styles.createMemoryButton, { marginTop: 20, backgroundColor: 'rgba(255, 159, 28, 0.2)' }]}
-                onPress={async () => {
-                try {
-                  Alert.alert('提示', '正在生成新的对话总结，请稍候...');
-                  const safeConversationId = getSafeConversationId(conversationId);
-                  
-                  // 获取API设置
-                  const settings = getApiSettings();
-                  // 适配API设置格式
-                  const apiConfig = {
-                    apiProvider: settings.apiProvider as 'gemini' | 'openrouter' | 'openai-compatible',
-                    openrouter: settings.openrouter
-                  };
-                  
-                  const result = await memoryService.summarizeMemoryNow(
-                    safeConversationId, 
-                    characterId,
-                    settings.apiKey || '', // API key will be loaded from settings
-                    apiConfig // 使用从settings-helper获取的API设置
-                  );
-                  
-                  if (result) {
-                    Alert.alert('成功', '新的对话总结已生成');
-                    await fetchSummaries();
-                  } else {
-                    Alert.alert('错误', '生成对话总结失败');
-                  }
-                } catch (e) {
-                  console.error('[MemoOverlay] Error generating summary:', e);
-                  Alert.alert('错误', '生成对话总结失败');
-                }
-              }}
-            >
-              <Text style={styles.createMemoryButtonText}>生成新的对话总结</Text>
-            </TouchableOpacity>
-          ) }
-        </ScrollView>
-      )}
+              ) }
+            </ScrollView>
+          )}
     </View>
   );
 

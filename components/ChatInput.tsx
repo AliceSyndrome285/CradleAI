@@ -1945,7 +1945,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
     sendimgText: {
-    color: 'black',
+    color: '#fff',
     fontSize: 15,
     fontWeight: '400',
     marginLeft: 12,
