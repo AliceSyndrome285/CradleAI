@@ -1600,24 +1600,36 @@ const ApiSettings = () => {
                       {/* 主模型选择 */}
                       <View style={styles.modelSelectorContainer}>
                         <Text style={styles.inputLabel}>主模型</Text>
+                        <TextInput
+                          style={styles.input}
+                          value={geminiPrimaryModel}
+                          onChangeText={setGeminiPrimaryModel}
+                          placeholder="输入主模型名称或从列表选择"
+                          placeholderTextColor="#999"
+                        />
                         <TouchableOpacity
-                          style={styles.modelButton}
+                          style={styles.selectFromListButton}
                           onPress={() => openModelPicker('primary')}
                         >
-                          <Text style={styles.modelButtonText}>{geminiPrimaryModel}</Text>
-                          <Ionicons name="chevron-down" size={16} color="#fff" />
+                          <Text style={styles.selectFromListButtonText}>从列表选择</Text>
                         </TouchableOpacity>
                       </View>
                       
                       {/* 备用模型选择 */}
                       <View style={styles.modelSelectorContainer}>
                         <Text style={styles.inputLabel}>备用模型</Text>
+                        <TextInput
+                          style={styles.input}
+                          value={geminiBackupModel}
+                          onChangeText={setGeminiBackupModel}
+                          placeholder="输入备用模型名称或从列表选择"
+                          placeholderTextColor="#999"
+                        />
                         <TouchableOpacity
-                          style={styles.modelButton}
+                          style={styles.selectFromListButton}
                           onPress={() => openModelPicker('backup')}
                         >
-                          <Text style={styles.modelButtonText}>{geminiBackupModel}</Text>
-                          <Ionicons name="chevron-down" size={16} color="#fff" />
+                          <Text style={styles.selectFromListButtonText}>从列表选择</Text>
                         </TouchableOpacity>
                       </View>
                       
@@ -2676,6 +2688,19 @@ const styles = StyleSheet.create({
   modelButtonText: {
     color: '#fff',
     fontSize: 16,
+  },
+  selectFromListButton: {
+    backgroundColor: theme.colors.secondary, // Or any other suitable color
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  selectFromListButtonText: {
+    color: '#fff', // Or black, depending on button background
+    fontSize: 14,
+    fontWeight: 'bold',
   },
   switchContainer: {
     flexDirection: 'row',
