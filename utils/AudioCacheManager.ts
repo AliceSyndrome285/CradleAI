@@ -19,12 +19,77 @@ export interface AudioState {
 }
 
 export class AudioCacheManager {
+  private readonly MAX_AUDIO_CACHE_SIZE_BYTES = 100 * 1024 * 1024; // 100MB
+  private readonly TARGET_AUDIO_CACHE_SIZE_BYTES = 70 * 1024 * 1024; // 70MB
   private static instance: AudioCacheManager;
   private readonly AUDIO_CACHE_DIR = `${FileSystem.documentDirectory}audio_cache/`;
   private readonly AUDIO_FILE_MAP_KEY = 'audio_file_map';
   private audioFileMap: Map<string, string> = new Map(); // messageId -> filePath
   private audioStates: Map<string, AudioState> = new Map(); // messageId -> state
   private soundMap: Map<string, Audio.Sound> = new Map(); // messageId -> sound instance
+
+  private async evictOldestFiles(bytesToFree: number): Promise<void> {
+    console.log(`[AudioCacheManager] Attempting to free ${bytesToFree} bytes...`);
+    try {
+      const evictableEntries: Array<{ messageId: string, filePath: string, timestamp: number, size: number }> = [];
+      for (const [messageId, filePath] of this.audioFileMap.entries()) {
+        try {
+          const fileInfo = await FileSystem.getInfoAsync(filePath);
+          if (!fileInfo.exists || !('size' in fileInfo)) {
+            console.warn(`[AudioCacheManager] File not found or size unavailable for eviction: ${filePath}`);
+            continue;
+          }
+          // Using fileInfo.modificationTime as timestamp for eviction logic.
+          // If AudioState had a more reliable lastAccessed timestamp, it would be preferred.
+          const timestamp = fileInfo.modificationTime || Date.now();
+          evictableEntries.push({ messageId, filePath, timestamp, size: fileInfo.size });
+        } catch (infoError) {
+          console.warn(`[AudioCacheManager] Error getting info for ${filePath}:`, infoError);
+        }
+      }
+
+      evictableEntries.sort((a, b) => a.timestamp - b.timestamp); // Oldest first
+
+      let bytesFreed = 0;
+      for (const oldestEntry of evictableEntries) {
+        if (bytesFreed >= bytesToFree) {
+          break;
+        }
+        console.log(`[AudioCacheManager] Evicting: ${oldestEntry.filePath}, size: ${oldestEntry.size}, timestamp: ${new Date(oldestEntry.timestamp).toISOString()}`);
+        try {
+          await FileSystem.deleteAsync(oldestEntry.filePath, { idempotent: true });
+          this.audioFileMap.delete(oldestEntry.messageId);
+          this.audioStates.delete(oldestEntry.messageId);
+          const sound = this.soundMap.get(oldestEntry.messageId);
+          if (sound) {
+            await sound.unloadAsync().catch(e => console.warn(`Error unloading sound for ${oldestEntry.messageId}`, e));
+            this.soundMap.delete(oldestEntry.messageId);
+          }
+          bytesFreed += oldestEntry.size;
+        } catch (deleteError) {
+          console.error(`[AudioCacheManager] Error evicting file ${oldestEntry.filePath}:`, deleteError);
+        }
+      }
+      console.log(`[AudioCacheManager] Freed ${bytesFreed} bytes.`);
+      await this.saveAudioFileMap();
+      await this.saveAudioStates();
+    } catch (error) {
+      console.error('[AudioCacheManager] Error during eviction process:', error);
+    }
+  }
+
+  private async ensureCacheCapacity(newFileSizeEstimate: number): Promise<void> {
+    try {
+      const currentSize = await this.getCacheSize();
+      if (currentSize + newFileSizeEstimate > this.MAX_AUDIO_CACHE_SIZE_BYTES) {
+        const bytesToEvict = (currentSize + newFileSizeEstimate) - this.TARGET_AUDIO_CACHE_SIZE_BYTES;
+        console.log(`[AudioCacheManager] Cache limit (${this.MAX_AUDIO_CACHE_SIZE_BYTES} bytes) exceeded. Current: ${currentSize}, NewFile: ${newFileSizeEstimate}. Need to evict ${bytesToEvict} bytes to reach target ${this.TARGET_AUDIO_CACHE_SIZE_BYTES}.`);
+        await this.evictOldestFiles(bytesToEvict);
+      }
+    } catch (error) {
+      console.error('[AudioCacheManager] Error ensuring cache capacity:', error);
+    }
+  }
 
   private constructor() {
     this.initializeCache();
@@ -206,6 +271,18 @@ export class AudioCacheManager {
       } else {
         // 既不是远程URL，也不是本地文件，直接报错
         throw new Error(`Unsupported audioPath format: ${audioPath}`);
+      }
+
+      // Get file info for the newly cached file to check its size
+      const newFileInfo = await FileSystem.getInfoAsync(localAudioPath);
+      if (!newFileInfo.exists || !('size' in newFileInfo) || typeof newFileInfo.size !== 'number') {
+        console.error(`[AudioCacheManager] Failed to get size for cached file: ${localAudioPath}. Skipping cache capacity check for this file.`);
+        // Optionally, delete the file if size cannot be determined, or handle as per requirements
+        // For now, we'll proceed without adding it to the map if size is critical,
+        // or assume 0 if it's acceptable to proceed with an unknown size (not recommended for cache management).
+        // throw new Error(`Failed to get size for cached file: ${localAudioPath}`);
+      } else {
+        await this.ensureCacheCapacity(newFileInfo.size);
       }
 
       // 更新映射
